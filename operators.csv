@@ -1,0 +1,25 @@
+++, 5
+return ..., 14
+[ ... ], 4
+undo(), 2
+<=, 2
+min(), 2
+minimax(), 2
+., 14
+getPieceValue(), 1
+slice(), 1
+-, 4
+<, 4
++, 1
+ugly_move(), 2
+=, 16
+===, 1
+reverse(), 1
+max(), 2
+{}, 12
+evaluateBoard(), 1
+if ..., 4
+!, 2
+board(), 1
+for ..., 4
+ugly_moves(), 1
