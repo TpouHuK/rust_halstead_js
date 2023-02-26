@@ -103,6 +103,11 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         dict.add_operator(".".to_string());
     };
 
+    /* Dots inside object.paths */
+    if node.is::<ast::GroupingExpr>() {
+        dict.add_operator("( )".to_string());
+    };
+
     /* Constructor expression */
     if node.is::<ast::NewExpr>() {
         dict.add_operator("new ...".to_string());
@@ -197,3 +202,26 @@ pub fn process_js(source: &str) -> Dictionary {
     walker(&syntax, 4, &mut dict);
     dict
 }
+
+mod lab2 {
+
+    #[derive(Default)]
+    pub struct Metrics{
+        cyclomatic_complexity: usize,
+    }
+    use super::*;
+
+    fn walker(node: &SyntaxNode, ident: usize, dict: &mut Metrics) {
+        /* If statement, with or without else blocks. */
+        if node.is::<ast::IfStmt>() {
+        };
+    }
+
+    pub fn process_lab2(source: &str) -> Metrics {
+        let syntax = rslint_parser::parse_text(source, 0).syntax();
+        let mut metrics = Default::default();
+        walker(&syntax, 4, &mut metrics);
+        metrics
+    }
+}
+
