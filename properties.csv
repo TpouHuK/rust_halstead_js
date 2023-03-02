@@ -1,10 +1,13 @@
-Unique operators, 0
-Unique operands, 0
-Total operators, 0
-Total operands, 0
-Program dictionary, 0
-Program length, 0
-Program volume, NaN
-Djilb CL (amount of if's), 0
-Djilb cl (if saturation), 0
-Djilb CLI (max if depth), 0
+Unique operators, 1
+Unique operands, 2
+Total operators, 1
+Total operands, 2
+Program dictionary, 3
+Program length, 3
+Program volume, 3
+Djilb CL
+(amount of if's), 0
+Djilb cl
+(if saturation), 0
+Djilb CLI
+(max if depth), 0

@@ -2,15 +2,49 @@ use rslint_parser::SyntaxNode;
 
 extern crate rslint_parser;
 use rslint_parser::*;
+use rslint_parser::ast::Pattern;
 use std::collections::HashMap;
+
+#[derive(Hash, Debug, Clone, Copy)]
+enum ChepinType {
+    P = 1,
+    M = 2,
+    C = 3,
+    T = 4,
+}
+
+fn upgrade_rank(rank: ChepinType, new_rank: ChepinType) -> ChepinType {
+    if (new_rank as usize) > (rank as usize) {
+        new_rank
+    } else {
+        rank
+    }
+}
+
+#[derive(Hash, Debug)]
+pub struct IdentProperties {
+    ctype: ChepinType,
+    spen: usize,
+    used_in: Vec<String>,
+}
+
+#[derive(Hash, Debug)]
+enum ScopeType {
+    Block,
+    ControllCondition,
+    Assignment(String),
+}
 
 #[derive(Default, Debug)]
 pub struct Dictionary {
     if_depth: usize,
     switch_djilb_cli: usize,
+    cur_scope: Vec<ScopeType>,
+
     pub max_if_depth: usize,
     pub operators: HashMap<String, usize>,
     pub operands: HashMap<String, usize>,
+    pub identifiers: HashMap<String, IdentProperties>,
     pub properties: Vec<(String, String)>,
 }
 
@@ -29,12 +63,42 @@ impl Dictionary {
         };
     }
 
+    fn add_identifier(&mut self, ident: String) {
+        let scope = self.cur_scope.last().expect("We are in a scope");
+        let new_ctype = match &scope {
+            ScopeType::Block => { ChepinType::T },
+            ScopeType::Assignment(ident_left) => { 
+                let props = self.identifiers.get_mut(ident_left).unwrap();
+                props.used_in.push(ident.clone());
+                ChepinType::M 
+                },
+            ScopeType::ControllCondition => { ChepinType::C },
+        };
+        
+        match self.identifiers.get_mut(&ident) {
+            None => {
+                self.identifiers.insert(
+                    ident,
+                    IdentProperties {
+                        ctype: new_ctype,
+                        spen: 0,
+                        used_in: Vec::new(),
+                    },
+                );
+            }
+            Some(IdentProperties { ctype, spen, .. }) => {
+                *ctype = upgrade_rank(*ctype, new_ctype);
+                *spen += 1;
+            }
+        };
+    }
+
     pub fn compute_properties(&mut self) {
         let op_dict = self.operators.len();
         let od_dict = self.operands.len();
-        let op_total = self.operators.values().into_iter().sum::<usize>();
-        let od_total = self.operands.values().into_iter().sum::<usize>();
-        
+        let op_total: usize = self.operators.values().sum();
+        let od_total: usize = self.operands.values().sum();
+
         let program_dict = op_dict + od_dict;
         let program_len = op_total + od_total;
         let program_volume = program_len as f32 * (od_dict as f32).log2();
@@ -45,7 +109,7 @@ impl Dictionary {
             if_saturation = 0.0;
         }
         let max_if_depth = self.max_if_depth;
-        
+
         self.properties = vec![
             ("Unique operators".to_string(), format!("{op_dict}")),
             ("Unique operands".to_string(), format!("{od_dict}")),
@@ -54,16 +118,23 @@ impl Dictionary {
             ("Program dictionary".to_string(), format!("{program_dict}")),
             ("Program length".to_string(), format!("{program_len}")),
             ("Program volume".to_string(), format!("{program_volume}")),
-            ("Djilb CL (amount of if's)".to_string(), format!("{amount_of_ifs}")),
-            ("Djilb cl (if saturation)".to_string(), format!("{if_saturation}")),
-            ("Djilb CLI (max if depth)".to_string(), format!("{max_if_depth}")),
+            (
+                "Djilb CL\n(amount of if's)".to_string(),
+                format!("{amount_of_ifs}"),
+            ),
+            (
+                "Djilb cl\n(if saturation)".to_string(),
+                format!("{if_saturation}"),
+            ),
+            (
+                "Djilb CLI\n(max if depth)".to_string(),
+                format!("{max_if_depth}"),
+            ),
         ]
     }
 }
 
 fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
-    println!("{:width$}{node:?} = '{node}'", "", width = &ident);
-
     /* => */
     if node.is::<ast::ArrowExpr>() {
         dict.add_operator("=>".to_string());
@@ -127,6 +198,12 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         dict.add_operand(ident_or_lit);
     };
 
+    /* Identifiers */
+    if node.is::<ast::Name>() || node.is::<ast::NameRef>() {
+        let ident = node.text().to_string();
+        dict.add_identifier(ident);
+    }
+
     /* Binary expressions */
     if node.is::<ast::BinExpr>() {
         let bin_expr = ast::BinExpr::cast(node.clone()).unwrap();
@@ -139,11 +216,6 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         let un_expr = ast::UnaryExpr::cast(node.clone()).unwrap();
         let text = un_expr.op_token().unwrap().to_string();
         dict.add_operator(text);
-    }
-
-    /* Unary expressions */
-    if node.is::<ast::ReturnStmt>() {
-        dict.add_operator("return ...".to_string());
     }
 
     /* Unary expressions */
@@ -173,7 +245,6 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
                 /* Callee without last node, which was supposedly method/function */
                 for child in syntax.children() {
                     if child != func_name {
-                        eprintln!("walking: {child:?}");
                         walker(&child, ident + 4, dict);
                     }
                 }
@@ -191,22 +262,50 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
             walker(&child, ident + 4, dict);
         }
 
-        if call_expr.type_args().is_some() {
-            panic!("No typescript allowed. O_o");
-        }
-
         return;
     };
 
+    let mut did_enter_scope: bool = false;
     if node.is::<ast::IfStmt>() {
         dict.if_depth += 1;
-        dict.max_if_depth = dict.max_if_depth.max(dict.if_depth);
+        dict.cur_scope.push(ScopeType::ControllCondition);
+        did_enter_scope = true;
     } else if node.is::<ast::SwitchStmt>() {
         let stmt: ast::SwitchStmt = ast::SwitchStmt::cast(node.clone()).unwrap();
         let cases_count = stmt.cases().count();
         dict.switch_djilb_cli += cases_count - 1;
         dict.if_depth += cases_count - 1;
+
+        dict.cur_scope.push(ScopeType::ControllCondition);
+        did_enter_scope = true;
+    } else if node.is::<ast::WhileStmt>()
+        || node.is::<ast::ForStmt>()
+        || node.is::<ast::DoWhileStmt>()
+        || node.is::<ast::Script>()
+    {
+        dict.cur_scope.push(ScopeType::Block);
+        did_enter_scope = true;
     }
+
+    /* if node.is::<ast::AssignExpr>() || node.is::<ast::Declarator>() {
+        let left_side = if node.is::<ast::AssignExpr>() {
+            eprintln!("ASGN => {node:?}");
+            let asgn = ast::AssignExpr::cast(node.clone()).unwrap();
+            // Will panic on complex assign expressions
+            let lhs = asgn.lhs().unwrap();
+            match lhs {
+                ast::PatternOrExpr::Expr(expr) => {
+                },
+                ast::PatternOrExpr::Pattern(ptrn) => { }
+            };
+        } else {
+            todo!()
+        };
+    }*/
+
+    //} else if node.is::<ast::BlockStmt> || node.is::<ast::TsBoolean>{
+    //}
+    dict.max_if_depth = dict.max_if_depth.max(dict.if_depth);
 
     single_step(node, ident, dict);
     for child in node.children() {
@@ -221,11 +320,16 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         dict.switch_djilb_cli += cases_count - 1;
         dict.if_depth -= cases_count - 1;
     }
+
+    if did_enter_scope {
+        dict.cur_scope.pop();
+    }
 }
 
 pub fn process_js(source: &str) -> Dictionary {
     let syntax = rslint_parser::parse_text(source, 0).syntax();
     let mut dict = Default::default();
-    walker(&syntax, 4, &mut dict);
+    walker(&dbg!(syntax), 4, &mut dict);
+    eprintln!("{:?}", dict.identifiers);
     dict
 }

@@ -48,7 +48,7 @@ impl eframe::App for MyApp {
                 ui.push_id(0, |ui| {
                     TableBuilder::new(ui)
                         .striped(true)
-                        .column(Column::initial(80.0))
+                        .column(Column::initial(120.0))
                         .column(Column::remainder())
                         .header(10.0, |mut header| {
                             header.col(|ui| {
