@@ -3,8 +3,8 @@
 use eframe::egui;
 mod syntax_highlighting;
 
-mod halstead;
-use halstead::*;
+mod metrics;
+use metrics::*;
 
 fn main() -> Result<(), eframe::Error> {
     // Log to stdout (if you run with `RUST_LOG=debug`).

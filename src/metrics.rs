@@ -6,6 +6,9 @@ use std::collections::HashMap;
 
 #[derive(Default, Debug)]
 pub struct Dictionary {
+    if_depth: usize,
+    switch_djilb_cli: usize,
+    pub max_if_depth: usize,
     pub operators: HashMap<String, usize>,
     pub operands: HashMap<String, usize>,
     pub properties: Vec<(String, String)>,
@@ -35,6 +38,13 @@ impl Dictionary {
         let program_dict = op_dict + od_dict;
         let program_len = op_total + od_total;
         let program_volume = program_len as f32 * (od_dict as f32).log2();
+        let amount_of_ifs = self.operators.get("if ...").unwrap_or(&0) + self.switch_djilb_cli;
+
+        let mut if_saturation = amount_of_ifs as f32 / op_total as f32;
+        if if_saturation.is_nan() {
+            if_saturation = 0.0;
+        }
+        let max_if_depth = self.max_if_depth;
         
         self.properties = vec![
             ("Unique operators".to_string(), format!("{op_dict}")),
@@ -44,13 +54,11 @@ impl Dictionary {
             ("Program dictionary".to_string(), format!("{program_dict}")),
             ("Program length".to_string(), format!("{program_len}")),
             ("Program volume".to_string(), format!("{program_volume}")),
+            ("Djilb CL (amount of if's)".to_string(), format!("{amount_of_ifs}")),
+            ("Djilb cl (if saturation)".to_string(), format!("{if_saturation}")),
+            ("Djilb CLI (max if depth)".to_string(), format!("{max_if_depth}")),
         ]
     }
-}
-
-fn get_js_source() -> String {
-    //std::fs::read_to_string("program.js").unwrap()
-    std::fs::read_to_string("test.js").unwrap()
 }
 
 fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
@@ -190,9 +198,28 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         return;
     };
 
+    if node.is::<ast::IfStmt>() {
+        dict.if_depth += 1;
+        dict.max_if_depth = dict.max_if_depth.max(dict.if_depth);
+    } else if node.is::<ast::SwitchStmt>() {
+        let stmt: ast::SwitchStmt = ast::SwitchStmt::cast(node.clone()).unwrap();
+        let cases_count = stmt.cases().count();
+        dict.switch_djilb_cli += cases_count - 1;
+        dict.if_depth += cases_count - 1;
+    }
+
     single_step(node, ident, dict);
     for child in node.children() {
         walker(&child, ident + 4, dict);
+    }
+
+    if node.is::<ast::IfStmt>() {
+        dict.if_depth -= 1;
+    } else if node.is::<ast::SwitchStmt>() {
+        let stmt: ast::SwitchStmt = ast::SwitchStmt::cast(node.clone()).unwrap();
+        let cases_count = stmt.cases().count();
+        dict.switch_djilb_cli += cases_count - 1;
+        dict.if_depth -= cases_count - 1;
     }
 }
 
@@ -202,26 +229,3 @@ pub fn process_js(source: &str) -> Dictionary {
     walker(&syntax, 4, &mut dict);
     dict
 }
-
-mod lab2 {
-
-    #[derive(Default)]
-    pub struct Metrics{
-        cyclomatic_complexity: usize,
-    }
-    use super::*;
-
-    fn walker(node: &SyntaxNode, ident: usize, dict: &mut Metrics) {
-        /* If statement, with or without else blocks. */
-        if node.is::<ast::IfStmt>() {
-        };
-    }
-
-    pub fn process_lab2(source: &str) -> Metrics {
-        let syntax = rslint_parser::parse_text(source, 0).syntax();
-        let mut metrics = Default::default();
-        walker(&syntax, 4, &mut metrics);
-        metrics
-    }
-}
-
