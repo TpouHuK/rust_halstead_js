@@ -1,4 +1,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // hide console window on Windows in release
+#![allow(dead_code)]
 
 use eframe::egui;
 mod syntax_highlighting;
@@ -25,6 +26,7 @@ fn main() -> Result<(), eframe::Error> {
 struct MyApp {
     code: String,
     dict: Dictionary,
+    graph_window: bool,
 }
 
 impl Default for MyApp {
@@ -32,6 +34,7 @@ impl Default for MyApp {
         Self {
             code: "".to_string(),
             dict: Dictionary::default(),
+            graph_window: false, 
         }
     }
 }
@@ -45,6 +48,16 @@ impl eframe::App for MyApp {
             .min_width(400.0)
             .show(ctx, |ui| {
                 use egui_extras::{Column, TableBuilder};
+                if ui.button("Toggle graph window").clicked() {
+                    self.graph_window = !self.graph_window;
+                }
+                
+                if self.graph_window {
+                    egui::Window::new("Program graph").show(ctx, |ui| {
+                       ui.label("Hello World!");
+                    });
+                }
+
                 ui.push_id(0, |ui| {
                     TableBuilder::new(ui)
                         .striped(true)
@@ -139,19 +152,19 @@ impl eframe::App for MyApp {
                 for (op, n) in self.dict.operators.iter() {
                     op_csv.push_str(&format!("{op}, {n}\n"));
                 }
-                std::fs::write("operators.csv", op_csv);
+                std::fs::write("operators.csv", op_csv).unwrap();
 
                 let mut od_csv = String::new();
                 for (od, n) in self.dict.operands.iter() {
                     od_csv.push_str(&format!("{od}, {n}\n"));
                 }
-                std::fs::write("operands.csv", od_csv);
+                std::fs::write("operands.csv", od_csv).unwrap();
 
                 let mut props = String::new();
                 for (p, v) in self.dict.properties.iter() {
                     props.push_str(&format!("{p}, {v}\n"));
                 }
-                std::fs::write("properties.csv", props);
+                std::fs::write("properties.csv", props).unwrap();
             }
 
             let mut theme = syntax_highlighting::CodeTheme::from_memory(ui.ctx());
