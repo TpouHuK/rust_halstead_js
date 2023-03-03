@@ -1,8 +1,8 @@
 use rslint_parser::SyntaxNode;
 
 extern crate rslint_parser;
-use rslint_parser::*;
 use rslint_parser::ast::Pattern;
+use rslint_parser::*;
 use std::collections::HashMap;
 
 #[derive(Hash, Debug, Clone, Copy)]
@@ -40,6 +40,7 @@ pub struct Dictionary {
     if_depth: usize,
     switch_djilb_cli: usize,
     cur_scope: Vec<ScopeType>,
+    operators_count: usize,
 
     pub max_if_depth: usize,
     pub operators: HashMap<String, usize>,
@@ -66,15 +67,15 @@ impl Dictionary {
     fn add_identifier(&mut self, ident: String) {
         let scope = self.cur_scope.last().expect("We are in a scope");
         let new_ctype = match &scope {
-            ScopeType::Block => { ChepinType::T },
-            ScopeType::Assignment(ident_left) => { 
+            ScopeType::Block => ChepinType::T,
+            ScopeType::Assignment(ident_left) => {
                 let props = self.identifiers.get_mut(ident_left).unwrap();
                 props.used_in.push(ident.clone());
-                ChepinType::M 
-                },
-            ScopeType::ControllCondition => { ChepinType::C },
+                ChepinType::M
+            }
+            ScopeType::ControllCondition => ChepinType::C,
         };
-        
+
         match self.identifiers.get_mut(&ident) {
             None => {
                 self.identifiers.insert(
@@ -104,20 +105,24 @@ impl Dictionary {
         let program_volume = program_len as f32 * (od_dict as f32).log2();
         let amount_of_ifs = self.operators.get("if ...").unwrap_or(&0) + self.switch_djilb_cli;
 
-        let mut if_saturation = amount_of_ifs as f32 / op_total as f32;
+        let mut if_saturation = amount_of_ifs as f32 / self.operators_count as f32;
         if if_saturation.is_nan() {
             if_saturation = 0.0;
         }
         let max_if_depth = self.max_if_depth;
 
         self.properties = vec![
-            ("Unique operators".to_string(), format!("{op_dict}")),
-            ("Unique operands".to_string(), format!("{od_dict}")),
-            ("Total operators".to_string(), format!("{op_total}")),
-            ("Total operands".to_string(), format!("{od_total}")),
-            ("Program dictionary".to_string(), format!("{program_dict}")),
-            ("Program length".to_string(), format!("{program_len}")),
-            ("Program volume".to_string(), format!("{program_volume}")),
+            //("Unique operators".to_string(), format!("{op_dict}")),
+            //("Unique operands".to_string(), format!("{od_dict}")),
+            //("Total operators".to_string(), format!("{op_total}")),
+            //("Total operands".to_string(), format!("{od_total}")),
+            //("Program dictionary".to_string(), format!("{program_dict}")),
+            //("Program length".to_string(), format!("{program_len}")),
+            //("Program volume".to_string(), format!("{program_volume}")),
+            (
+                "Program statements: ".to_string(),
+                format!("{}", self.operators_count),
+            ),
             (
                 "Djilb CL\n(amount of if's)".to_string(),
                 format!("{amount_of_ifs}"),
@@ -148,26 +153,36 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     /* If statement, with or without else blocks. */
     if node.is::<ast::IfStmt>() {
         dict.add_operator("if ...".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* Any kind of `for` loops */
     if node.is::<ast::ForStmtInit>() {
         dict.add_operator("for ...".to_string());
+        dict.operators_count += 2;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* Any kind of `for` loops */
     if node.is::<ast::WhileStmt>() {
         dict.add_operator("while ...".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* Any kind of `for` loops */
     if node.is::<ast::DoWhileStmt>() {
         dict.add_operator("do ... while ...".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* All the `=` signs */
     if node.is::<ast::Declarator>() {
         dict.add_operator("=".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* All the `=` signs */
@@ -175,6 +190,8 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         let expr = ast::AssignExpr::cast(node.clone()).unwrap();
         let op_token = expr.op_token().unwrap().to_string();
         dict.add_operator(op_token);
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     };
 
     /* Dots inside object.paths */
@@ -221,6 +238,15 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     /* Unary expressions */
     if node.is::<ast::ReturnStmt>() {
         dict.add_operator("return ...".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
+    }
+
+    /* Unary expressions */
+    if node.is::<ast::ThrowStmt>() {
+        dict.add_operator("return ...".to_string());
+        dict.operators_count += 1;
+        eprintln!("{: <1$}{:?}", node, ident)
     }
 
     /* Array subscription operator */
@@ -232,6 +258,11 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
 fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     /* Function and method's calls*/
     if node.is::<ast::CallExpr>() {
+        if let ScopeType::Block = dict.cur_scope.last().unwrap() {
+            dict.operators_count += 1;
+            eprintln!("{: <1$}{:?}", node, ident)
+        }
+
         /* Trying to extract function name */
         let call_expr = ast::CallExpr::cast(node.clone()).unwrap();
         let callee = call_expr.callee().unwrap();

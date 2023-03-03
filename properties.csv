@@ -1,13 +1,7 @@
-Unique operators, 1
-Unique operands, 2
-Total operators, 1
-Total operands, 2
-Program dictionary, 3
-Program length, 3
-Program volume, 3
+Program statements: , 17
 Djilb CL
-(amount of if's), 0
+(amount of if's), 6
 Djilb cl
-(if saturation), 0
+(if saturation), 0.3529412
 Djilb CLI
-(max if depth), 0
+(max if depth), 5
