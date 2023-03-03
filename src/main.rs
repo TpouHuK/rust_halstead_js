@@ -57,31 +57,64 @@ impl eframe::App for MyApp {
                        ui.label("Hello World!");
                     });
                 }
-
-                ui.push_id(0, |ui| {
+                ui.push_id(123, |ui| {
                     TableBuilder::new(ui)
                         .striped(true)
-                        .column(Column::initial(120.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
+                        .column(Column::initial(50.0))
                         .column(Column::remainder())
                         .header(10.0, |mut header| {
-                            header.col(|ui| {
-                                ui.heading("Property");
+                            header.col(|_ui| {
+                                
                             });
                             header.col(|ui| {
-                                ui.heading("value");
+                                ui.heading("Полная");
+                            });
+                            header.col(|ui| {
+                                ui.heading("Ввода вывода");
                             });
                         })
                         .body(|mut body| {
-                            for (param, value) in &self.dict.properties {
-                                body.row(30.0, |mut row| {
-                                    row.col(|ui| {
-                                        ui.label(param);
-                                    });
-                                    row.col(|ui| {
-                                        ui.label(value);
-                                    });
+                            body.row(30.0, |mut row| {
+                                row.col(|ui| {
+                                    ui.label("Группа переменных");
                                 });
-                            }
+                                row.col(|ui| {
+                                    ui.label("P");
+                                });
+                                row.col(|ui| {
+                                    ui.label("M");
+                                });
+
+                                row.col(|ui| {
+                                    ui.label("C");
+                                });
+                                
+                                row.col(|ui| {
+                                    ui.label("T");
+                                });
+
+                                row.col(|ui| {
+                                    ui.label("P");
+                                });
+                                row.col(|ui| {
+                                    ui.label("M");
+                                });
+
+                                row.col(|ui| {
+                                    ui.label("C");
+                                });
+                                
+                                row.col(|ui| {
+                                    ui.label("T");
+                                });
+                            });
                         });
                 });
 

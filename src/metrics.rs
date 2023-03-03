@@ -21,11 +21,12 @@ fn upgrade_rank(rank: ChepinType, new_rank: ChepinType) -> ChepinType {
     }
 }
 
-#[derive(Hash, Debug)]
+#[derive(Hash, Debug, Clone)]
 pub struct IdentProperties {
     ctype: ChepinType,
     spen: usize,
     used_in: Vec<String>,
+    visited: bool,
 }
 
 #[derive(Hash, Debug)]
@@ -33,6 +34,10 @@ enum ScopeType {
     Block,
     ControllCondition,
     Assignment(String),
+}
+
+struct ChepinTable {
+    pub variable_groups: [Vec<String>; 4],
 }
 
 #[derive(Default, Debug)]
@@ -64,8 +69,9 @@ impl Dictionary {
         };
     }
 
-    fn add_identifier(&mut self, ident: String) {
-        let scope = self.cur_scope.last().expect("We are in a scope");
+    fn add_identifier(&mut self, ident: String, input: bool) {
+        eprintln!("{:?}", self.cur_scope);
+        let scope = self.cur_scope.last().unwrap();
         let new_ctype = match &scope {
             ScopeType::Block => ChepinType::T,
             ScopeType::Assignment(ident_left) => {
@@ -79,11 +85,12 @@ impl Dictionary {
         match self.identifiers.get_mut(&ident) {
             None => {
                 self.identifiers.insert(
-                    ident,
+                    ident.clone(),
                     IdentProperties {
                         ctype: new_ctype,
                         spen: 0,
                         used_in: Vec::new(),
+                        visited: false,
                     },
                 );
             }
@@ -92,6 +99,17 @@ impl Dictionary {
                 *spen += 1;
             }
         };
+
+        /* no bueno redo later */
+        if let ScopeType::Assignment(ident_left) = &scope {
+            match self.identifiers.get_mut(&ident) {
+                Some(IdentProperties { used_in, .. }) => used_in.push(ident_left.clone()),
+                None => {
+                    unreachable!()
+                }
+            }
+        }
+
     }
 
     pub fn compute_properties(&mut self) {
@@ -136,6 +154,19 @@ impl Dictionary {
                 format!("{max_if_depth}"),
             ),
         ]
+    }
+
+    pub fn get_chepin(&self) -> ChepinTable {
+        let mut groups: [Vec<String>; 4] = Default::default();
+        for (name, props) in self.identifiers.iter() {
+            match props.ctype {
+                ChepinType::P => { groups[0].push(name.clone()) },
+                ChepinType::M => { groups[1].push(name.clone()) },
+                ChepinType::C => { groups[2].push(name.clone()) },
+                ChepinType::T => { groups[3].push(name.clone()) },
+            }
+        }
+        ChepinTable { variable_groups : groups }
     }
 }
 
@@ -218,7 +249,7 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     /* Identifiers */
     if node.is::<ast::Name>() || node.is::<ast::NameRef>() {
         let ident = node.text().to_string();
-        dict.add_identifier(ident);
+        dict.add_identifier(ident, false);
     }
 
     /* Binary expressions */
@@ -256,6 +287,7 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
 }
 
 fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
+    eprintln!("{:?}", node);
     /* Function and method's calls*/
     if node.is::<ast::CallExpr>() {
         if let ScopeType::Block = dict.cur_scope.last().unwrap() {
@@ -285,8 +317,18 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
 
         /* Count function name as an operator */
         let mut function_name = func_name.trimmed_text().to_string();
+
+        if function_name == "print" {
+            dict.cur_scope
+                .push(ScopeType::Assignment("%OUTPUT%".to_string()));
+        } else if function_name == "prompt" {
+            if let ScopeType::Assignment(left_side) = dict.cur_scope.last().unwrap() {
+                dict.add_identifier("%INPUT%".to_string(), true);
+            }
+        }
+
         function_name.push_str("()");
-        dict.add_operator(function_name);
+        dict.add_operator(function_name.clone());
 
         /* Process function arguments */
         for child in call_expr.arguments().unwrap().syntax().children() {
@@ -318,21 +360,29 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
         did_enter_scope = true;
     }
 
-    /* if node.is::<ast::AssignExpr>() || node.is::<ast::Declarator>() {
-        let left_side = if node.is::<ast::AssignExpr>() {
-            eprintln!("ASGN => {node:?}");
+    if node.is::<ast::AssignExpr>() || node.is::<ast::Declarator>() {
+        let (left_side, right_side) = if node.is::<ast::AssignExpr>() {
             let asgn = ast::AssignExpr::cast(node.clone()).unwrap();
             // Will panic on complex assign expressions
             let lhs = asgn.lhs().unwrap();
-            match lhs {
-                ast::PatternOrExpr::Expr(expr) => {
-                },
-                ast::PatternOrExpr::Pattern(ptrn) => { }
-            };
+            let rhs = asgn.rhs().unwrap();
+            (lhs.text().trim().to_string(), rhs)
         } else {
-            todo!()
+            let decl = ast::Declarator::cast(node.clone()).unwrap();
+            // Will panic on complex assign expressions
+            let lhs = decl.pattern().unwrap();
+            let rhs = decl.value().unwrap();
+            (lhs.text().trim().to_string(), rhs)
         };
-    }*/
+
+        dict.add_identifier(left_side.clone(), false);
+        dict.cur_scope.push(ScopeType::Assignment(left_side));
+
+        walker(right_side.syntax(), ident + 4, dict);
+        dict.cur_scope.pop();
+
+        return;
+    }
 
     //} else if node.is::<ast::BlockStmt> || node.is::<ast::TsBoolean>{
     //}
@@ -357,10 +407,63 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     }
 }
 
+fn set_visited_false(name: &str, identifies: &mut HashMap<String, IdentProperties>) {
+    if name == "%OUTPUT%" {
+        return;
+    }
+    /* that's a little n^n algorithm */
+
+    let mut_props = identifies.get_mut(name).unwrap();
+    if !mut_props.visited {return}
+    mut_props.visited = false;
+
+    for iter_name in mut_props.used_in.clone().iter() {
+        set_visited_false(iter_name, identifies);
+    }
+}
+
+fn check_if_used(name: &str, identifies: &mut HashMap<String, IdentProperties>) -> bool {
+    if name == "%OUTPUT%" {
+        return true;
+    }
+    /* that's a little n^n algorithm */
+
+    let mut_props = identifies.get_mut(name).unwrap();
+    if mut_props.visited { return false }
+    mut_props.visited = true;
+
+    for iter_name in mut_props.used_in.clone().iter() {
+        if check_if_used(iter_name, identifies) {
+            return true;
+        }
+    }
+
+    false
+}
+
 pub fn process_js(source: &str) -> Dictionary {
     let syntax = rslint_parser::parse_text(source, 0).syntax();
     let mut dict = Default::default();
     walker(&dbg!(syntax), 4, &mut dict);
+
+    if let Some(IdentProperties { used_in, .. }) = dict.identifiers.get("%INPUT%").cloned() {
+        for name in used_in.iter() {
+            let a = dict.identifiers.get_mut(name).unwrap();
+            a.ctype = ChepinType::P;
+        }
+    }
+
+    let all_idents: Vec<_> = dict.identifiers.keys().map(|v| v.to_owned()).collect();
+    for name in all_idents {
+        if name == "%INPUT%" {
+            continue;
+        }
+        if !check_if_used(&name, &mut dict.identifiers) {
+            dict.identifiers.get_mut(&name).unwrap().ctype = ChepinType::T;
+        }
+        set_visited_false(&name, &mut dict.identifiers);
+    }
     eprintln!("{:?}", dict.identifiers);
+
     dict
 }
