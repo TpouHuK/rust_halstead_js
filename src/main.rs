@@ -19,7 +19,7 @@ fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "My egui App",
         options,
-        Box::new(|_cc| Box::new(MyApp::default())),
+        Box::new(|_cc| Box::<MyApp>::default()),
     )
 }
 
@@ -188,13 +188,13 @@ impl eframe::App for MyApp {
                 std::fs::write("operators.csv", op_csv).unwrap();
 
                 let mut od_csv = String::new();
-                for (od, n) in self.dict.operands.iter() {
+                for (od, n) in &self.dict.operands {
                     od_csv.push_str(&format!("{od}, {n}\n"));
                 }
                 std::fs::write("operands.csv", od_csv).unwrap();
 
                 let mut props = String::new();
-                for (p, v) in self.dict.properties.iter() {
+                for (p, v) in &self.dict.properties {
                     props.push_str(&format!("{p}, {v}\n"));
                 }
                 std::fs::write("properties.csv", props).unwrap();

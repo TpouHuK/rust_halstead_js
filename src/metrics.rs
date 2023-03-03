@@ -1,7 +1,6 @@
 use rslint_parser::SyntaxNode;
 
 extern crate rslint_parser;
-use rslint_parser::ast::Pattern;
 use rslint_parser::*;
 use std::collections::HashMap;
 
@@ -36,7 +35,7 @@ enum ScopeType {
     Assignment(String),
 }
 
-struct ChepinTable {
+pub struct ChepinTable {
     pub variable_groups: [Vec<String>; 4],
 }
 
@@ -69,7 +68,7 @@ impl Dictionary {
         };
     }
 
-    fn add_identifier(&mut self, ident: String, input: bool) {
+    fn add_identifier(&mut self, ident: String) {
         eprintln!("{:?}", self.cur_scope);
         let scope = self.cur_scope.last().unwrap();
         let new_ctype = match &scope {
@@ -112,6 +111,7 @@ impl Dictionary {
 
     }
 
+    #[allow(unused_variables)]
     pub fn compute_properties(&mut self) {
         let op_dict = self.operators.len();
         let od_dict = self.operands.len();
@@ -249,7 +249,7 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
     /* Identifiers */
     if node.is::<ast::Name>() || node.is::<ast::NameRef>() {
         let ident = node.text().to_string();
-        dict.add_identifier(ident, false);
+        dict.add_identifier(ident);
     }
 
     /* Binary expressions */
@@ -322,8 +322,8 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
             dict.cur_scope
                 .push(ScopeType::Assignment("%OUTPUT%".to_string()));
         } else if function_name == "prompt" {
-            if let ScopeType::Assignment(left_side) = dict.cur_scope.last().unwrap() {
-                dict.add_identifier("%INPUT%".to_string(), true);
+            if let ScopeType::Assignment(_left_side) = dict.cur_scope.last().unwrap() {
+                dict.add_identifier("%INPUT%".to_string());
             }
         }
 
@@ -375,7 +375,7 @@ fn walker(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
             (lhs.text().trim().to_string(), rhs)
         };
 
-        dict.add_identifier(left_side.clone(), false);
+        dict.add_identifier(left_side.clone());
         dict.cur_scope.push(ScopeType::Assignment(left_side));
 
         walker(right_side.syntax(), ident + 4, dict);

@@ -209,6 +209,7 @@ impl Highlighter {
         use syntect::easy::HighlightLines;
         use syntect::highlighting::FontStyle;
         use syntect::util::LinesWithEndings;
+        use egui::text::{LayoutSection, TextFormat};
 
         let syntax = self
             .ps
@@ -218,7 +219,6 @@ impl Highlighter {
         let theme = theme.syntect_theme.syntect_key_name();
         let mut h = HighlightLines::new(syntax, &self.ts.themes[theme]);
 
-        use egui::text::{LayoutSection, TextFormat};
 
         let mut job = LayoutJob {
             text: text.into(),
