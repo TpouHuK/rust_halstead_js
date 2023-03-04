@@ -211,6 +211,7 @@ fn single_step(node: &SyntaxNode, ident: usize, dict: &mut Dictionary) {
 
     /* All the `=` signs */
     if node.is::<ast::Declarator>() {
+        panic!();
         dict.add_operator("=".to_string());
         dict.operators_count += 1;
         eprintln!("{: <1$}{:?}", node, ident)

@@ -55,10 +55,39 @@ impl eframe::App for MyApp {
                 if self.graph_window {
                     egui::Window::new("Program graph").show(ctx, |ui| {
                         let _visuals = ui.style();
-                        ui.painter().circle(egui::pos2(100.0, 100.0), 10.0, egui::Color32::GOLD, egui::Stroke::NONE);
                     });
                 }
 
+               ui.push_id(0, |ui| {
+                    TableBuilder::new(ui)
+                        .striped(true)
+                        .column(Column::initial(120.0))
+                        .column(Column::remainder())
+                        .header(10.0, |mut header| {
+                            header.col(|ui| {
+                                ui.heading("Property");
+                            });
+                            header.col(|ui| {
+                                ui.heading("value");
+                            });
+                        })
+                        .body(|mut body| {
+                            for (param, value) in &self.dict.properties {
+                                body.row(30.0, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label(param);
+                                    });
+                                    row.col(|ui| {
+                                        ui.label(value);
+                                    });
+                                });
+                            }
+                        });
+                });
+
+                
+
+                /*
                 ui.columns(2, |columns| {
                     columns[0].push_id(1, |ui| {
                         TableBuilder::new(ui)
@@ -113,7 +142,7 @@ impl eframe::App for MyApp {
                                 }
                             });
                     });
-                });
+                }); */
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
