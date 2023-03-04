@@ -65,7 +65,7 @@ impl SyntectTheme {
         .copied()
     }
 
-    fn name(&self) -> &'static str {
+    fn name(self) -> &'static str {
         match self {
             Self::Base16EightiesDark => "Base16 Eighties (dark)",
             Self::Base16MochaDark => "Base16 Mocha (dark)",
@@ -77,7 +77,7 @@ impl SyntectTheme {
         }
     }
 
-    fn syntect_key_name(&self) -> &'static str {
+    fn syntect_key_name(self) -> &'static str {
         match self {
             Self::Base16EightiesDark => "base16-eighties.dark",
             Self::Base16MochaDark => "base16-mocha.dark",
@@ -89,7 +89,7 @@ impl SyntectTheme {
         }
     }
 
-    pub fn is_dark(&self) -> bool {
+    pub fn is_dark(self) -> bool {
         match self {
             Self::Base16EightiesDark
             | Self::Base16MochaDark
@@ -206,10 +206,10 @@ impl Highlighter {
     }
 
     fn highlight_impl(&self, theme: &CodeTheme, text: &str, language: &str) -> Option<LayoutJob> {
+        use egui::text::{LayoutSection, TextFormat};
         use syntect::easy::HighlightLines;
         use syntect::highlighting::FontStyle;
         use syntect::util::LinesWithEndings;
-        use egui::text::{LayoutSection, TextFormat};
 
         let syntax = self
             .ps
@@ -218,7 +218,6 @@ impl Highlighter {
 
         let theme = theme.syntect_theme.syntect_key_name();
         let mut h = HighlightLines::new(syntax, &self.ts.themes[theme]);
-
 
         let mut job = LayoutJob {
             text: text.into(),

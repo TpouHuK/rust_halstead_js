@@ -5,7 +5,7 @@ use eframe::egui;
 mod syntax_highlighting;
 
 mod metrics;
-use metrics::*;
+use metrics::{Metric, process_js};
 
 fn main() -> Result<(), eframe::Error> {
     // Log to stdout (if you run with `RUST_LOG=debug`).
@@ -23,20 +23,11 @@ fn main() -> Result<(), eframe::Error> {
     )
 }
 
+#[derive(Default)]
 struct MyApp {
     code: String,
-    dict: Dictionary,
+    metric: Metric,
     graph_window: bool,
-}
-
-impl Default for MyApp {
-    fn default() -> Self {
-        Self {
-            code: "".to_string(),
-            dict: Dictionary::default(),
-            graph_window: false, 
-        }
-    }
 }
 
 impl eframe::App for MyApp {
@@ -51,14 +42,14 @@ impl eframe::App for MyApp {
                 if ui.button("Toggle graph window").clicked() {
                     self.graph_window = !self.graph_window;
                 }
-                
+
                 if self.graph_window {
                     egui::Window::new("Program graph").show(ctx, |ui| {
                         let _visuals = ui.style();
                     });
                 }
 
-               ui.push_id(0, |ui| {
+                ui.push_id(0, |ui| {
                     TableBuilder::new(ui)
                         .striped(true)
                         .column(Column::initial(120.0))
@@ -72,7 +63,7 @@ impl eframe::App for MyApp {
                             });
                         })
                         .body(|mut body| {
-                            for (param, value) in &self.dict.properties {
+                            for (param, value) in &self.metric.properties {
                                 body.row(30.0, |mut row| {
                                     row.col(|ui| {
                                         ui.label(param);
@@ -84,87 +75,15 @@ impl eframe::App for MyApp {
                             }
                         });
                 });
-
-                
-
-                /*
-                ui.columns(2, |columns| {
-                    columns[0].push_id(1, |ui| {
-                        TableBuilder::new(ui)
-                            .striped(true)
-                            .column(Column::initial(90.0))
-                            .column(Column::remainder())
-                            .header(10.0, |mut header| {
-                                header.col(|ui| {
-                                    ui.heading("Operands");
-                                });
-                                header.col(|ui| {
-                                    ui.heading("Count");
-                                });
-                            })
-                            .body(|mut body| {
-                                for (operand, amount) in self.dict.operands.iter() {
-                                    body.row(30.0, |mut row| {
-                                        row.col(|ui| {
-                                            ui.label(operand);
-                                        });
-                                        row.col(|ui| {
-                                            ui.label(format!("{amount}"));
-                                        });
-                                    });
-                                }
-                            });
-                    });
-
-                    columns[1].push_id(2, |ui| {
-                        TableBuilder::new(ui)
-                            .striped(true)
-                            .column(Column::initial(90.0))
-                            .column(Column::remainder())
-                            .header(10.0, |mut header| {
-                                header.col(|ui| {
-                                    ui.heading("Operators");
-                                });
-                                header.col(|ui| {
-                                    ui.heading("Count");
-                                });
-                            })
-                            .body(|mut body| {
-                                for (operand, amount) in self.dict.operators.iter() {
-                                    body.row(30.0, |mut row| {
-                                        row.col(|ui| {
-                                            ui.label(operand);
-                                        });
-                                        row.col(|ui| {
-                                            ui.label(format!("{amount}"));
-                                        });
-                                    });
-                                }
-                            });
-                    });
-                }); */
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Javascript halstead complexity");
             if ui.button("Compute").clicked() {
-                self.dict = process_js(&self.code);
-                self.dict.compute_properties();
-
-                let mut op_csv = String::new();
-                for (op, n) in self.dict.operators.iter() {
-                    op_csv.push_str(&format!("{op}, {n}\n"));
-                }
-                std::fs::write("operators.csv", op_csv).unwrap();
-
-                let mut od_csv = String::new();
-                for (od, n) in &self.dict.operands {
-                    od_csv.push_str(&format!("{od}, {n}\n"));
-                }
-                std::fs::write("operands.csv", od_csv).unwrap();
+                self.metric = process_js(&self.code);
+                self.metric.compute_properties();
 
                 let mut props = String::new();
-                for (p, v) in &self.dict.properties {
+                for (p, v) in &self.metric.properties {
                     props.push_str(&format!("{p}, {v}\n"));
                 }
                 std::fs::write("properties.csv", props).unwrap();
