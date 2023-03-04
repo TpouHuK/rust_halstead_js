@@ -83,9 +83,9 @@ fn process_operator(node: &SyntaxNode, metric: &mut Metric) {
         stmt.test();
         let mut depth_inc = 0;
         for stmt in stmt.cases() {
-            process_operator(stmt.syntax(), metric);
             depth_inc += 1;
             metric.inc_if_depth();
+            process_operator(stmt.syntax(), metric);
         }
         metric.if_depth -= depth_inc;
 
