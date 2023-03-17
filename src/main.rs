@@ -78,6 +78,8 @@ impl eframe::App for MyApp {
             });
 
         egui::CentralPanel::default().show(ctx, |ui| {
+            egui::widgets::global_dark_light_mode_buttons(ui);
+
             if ui.button("Compute").clicked() {
                 self.metric = process_js(&self.code);
                 self.metric.compute_properties();

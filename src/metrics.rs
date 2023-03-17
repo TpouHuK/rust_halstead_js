@@ -17,7 +17,7 @@ pub struct Metric {
 impl Metric {
     pub fn compute_properties(&mut self) {
         #[allow(clippy::cast_precision_loss)]
-        let if_saturation = self.blockscheme_operators as f32 / self.amount_of_ifs as f32;
+        let if_saturation = self.amount_of_ifs as f32 / self.blockscheme_operators as f32;
         self.properties = vec![
             (
                 "Operators count".to_owned(),
@@ -88,11 +88,10 @@ fn process_operator(node: &SyntaxNode, metric: &mut Metric) {
             process_operator(stmt.syntax(), metric);
         }
         metric.if_depth -= depth_inc;
-
-        todo!();
+        return;
     }
 
-    // Loop operators: While/For/ForEach
+    // Loop operators: While/For
     if node.is::<ForStmt>() {
         let stmt: ForStmt = node.to();
         process_operator(stmt.init().unwrap().syntax(), metric);
